@@ -1,5 +1,5 @@
 {
-  "name": "Obision Extension Grid",
+  "name": "Obision Grid",
   "description": "A GNOME Shell extension for grid-based window management",
   "uuid": "obision-extension-grid@obision.com",
   "shell-version": [
