@@ -1,170 +1,179 @@
 /* Obision Extension Grid - Stage Manager Styles */
 
-/* Side Panel */
+/* Side Panel - uses theme-aware background */
 .stage-manager-panel {
-    background-color: rgba(20, 20, 20, 0.95);
-    border-right: 2px solid rgba(255, 255, 255, 0.15);
-    box-shadow: none;
+    background-color: rgba(36, 36, 36, 0.90);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.stage-manager-content {
-    padding: 16px 12px;
+/* Light theme variant */
+.stage-manager-panel-light {
+    background-color: rgba(246, 246, 246, 0.90);
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 /* Resize Handle */
 .stage-manager-resize-handle {
-    background-color: rgba(255, 255, 255, 0.15);
-    background-image: repeating-linear-gradient(
-        0deg,
-        rgba(255, 255, 255, 0.3),
-        rgba(255, 255, 255, 0.3) 4px,
-        transparent 4px,
-        transparent 8px
-    );
-    border-left: 2px solid rgba(255, 255, 255, 0.25);
-    border-right: 2px solid rgba(255, 255, 255, 0.25);
-    cursor: ew-resize;
+    background-color: rgba(70, 70, 70, 1.0);
+    border-radius: 3px;
+    margin: 0 4px 0 8px;
     transition-duration: 200ms;
 }
 
 .stage-manager-resize-handle:hover {
-    background-color: rgba(53, 132, 228, 0.6);
-    background-image: repeating-linear-gradient(
-        0deg,
-        rgba(255, 255, 255, 0.4),
-        rgba(255, 255, 255, 0.4) 4px,
-        transparent 4px,
-        transparent 8px
-    );
-    border-left-color: rgba(53, 132, 228, 0.9);
-    border-right-color: rgba(53, 132, 228, 0.9);
+    background-color: rgba(53, 132, 228, 0.9);
 }
 
 .stage-manager-resize-handle:active {
-    background-color: rgba(53, 132, 228, 0.8);
-    border-left-color: rgba(53, 132, 228, 1.0);
-    border-right-color: rgba(53, 132, 228, 1.0);
+    background-color: rgba(53, 132, 228, 1.0);
+}
+
+.stage-manager-grip-container {
+    spacing: 3px;
+    padding: 4px 2px;
+}
+
+.stage-manager-grip-dot {
+    background-color: rgba(255, 255, 255, 0.4);
+    border-radius: 2px;
+}
+
+.stage-manager-resize-handle:hover .stage-manager-grip-dot {
+    background-color: rgba(255, 255, 255, 0.7);
 }
 
 .stage-manager-scroll {
     background-color: transparent;
+    padding: 0;
 }
 
 .stage-manager-thumbnail-container {
     spacing: 12px;
+    padding: 12px 0;
 }
 
 /* Window Thumbnail */
 .stage-manager-thumbnail {
-    background-color: rgba(40, 40, 40, 0.8);
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 8px;
+    background-color: transparent;
     transition-duration: 200ms;
-    max-width: 426px;
+    margin: 0 4px 0 4px;
 }
 
-.stage-manager-thumbnail > StBoxLayout > StWidget > StButton {
-    /* Hide any internal buttons except our close button */
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+/* Screenshot Panel (upper panel with window preview) */
+.stage-manager-screenshot-panel {
+    background-color: rgba(30, 30, 30, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px 14px 0 0;
+    padding: 8px;
 }
 
-.stage-manager-thumbnail:hover {
-    transform: scale(1.03);
-}
-
-.stage-manager-thumbnail:active {
-    transform: scale(0.98);
-}
-
-.stage-manager-thumbnail-box {
-    spacing: 8px;
+.stage-manager-thumbnail:hover .stage-manager-screenshot-panel {
+    background-color: rgba(45, 45, 45, 0.95);
+    border-color: rgba(255, 255, 255, 0.25);
 }
 
 /* Clone Container */
 .stage-manager-clone-container {
-    background-color: transparent;
+    background-color: rgba(20, 20, 20, 0.8);
     border-radius: 8px;
-    border: 2px solid rgba(128, 128, 128, 0.6);
-    height: 280px;
-    min-height: 280px;
-    max-height: 280px;
 }
 
-/* Hide window decorations in clone */
-.stage-manager-clone-container ClutterClone {
-    /* This will clip the window decorations */
-}
-
-/* Info box with icon and labels */
-.stage-manager-info-box {
-    spacing: 8px;
-    padding: 4px 8px;
-}
-
-.stage-manager-app-icon {
-    width: 24px;
-    height: 24px;
-}
-
-.stage-manager-app-name {
-    color: rgba(255, 255, 255, 0.95);
-    font-size: 14px;
-    font-weight: 500;
-}
-
-/* Bottom Panel (semi-transparent overlay) */
-.stage-manager-thumbnail-bottom-panel {
-    background-color: rgba(40, 40, 40, 0.5);
-    height: 48px;
-    padding: 8px 12px;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-    spacing: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Close Button - GNOME style */
+/* Close Button - default border matches thumbnail border */
 .stage-manager-close-button {
-    background-color: rgba(0, 0, 0, 0.5);
-    border: none;
-    border-radius: 50%;
+    background-color: rgba(50, 50, 50, 1.0);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
     width: 28px;
     height: 28px;
     min-width: 28px;
     min-height: 28px;
-    margin: 6px;
     padding: 0;
-    transition-duration: 100ms;
+    transition-duration: 150ms;
 }
 
+/* Close button hover - gray border */
 .stage-manager-close-button:hover {
-    background-color: #e81123;
-    transform: scale(1.05);
+    background-color: rgba(80, 80, 90, 1.0);
+    border-color: rgba(120, 120, 130, 1.0);
 }
 
 .stage-manager-close-button:active {
-    background-color: #c50f1f;
-    transform: scale(0.98);
+    background-color: rgba(100, 100, 110, 1.0);
+    border-color: rgba(140, 140, 150, 1.0);
+}
+
+/* When thumbnail is hovered, close button border matches thumbnail hover border */
+.stage-manager-thumbnail:hover .stage-manager-close-button {
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* When thumbnail is hovered and close button is hovered - gray */
+.stage-manager-thumbnail:hover .stage-manager-close-button:hover {
+    border-color: rgba(120, 120, 130, 1.0);
+}
+
+/* Close button blue border when thumbnail is active */
+.stage-manager-thumbnail-active .stage-manager-close-button {
+    border-color: rgba(53, 132, 228, 1.0);
+}
+
+/* Active thumbnail - close button hover stays blue (higher specificity) */
+.stage-manager-thumbnail-active .stage-manager-close-button:hover,
+.stage-manager-thumbnail-active:hover .stage-manager-close-button,
+.stage-manager-thumbnail-active:hover .stage-manager-close-button:hover {
+    background-color: rgba(80, 80, 90, 1.0);
+    border-color: rgba(53, 132, 228, 1.0);
 }
 
 .stage-manager-close-icon {
-    color: #ffffff;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+/* Bottom Panel (below screenshot) */
+.stage-manager-thumbnail-bottom-panel {
+    background-color: rgba(30, 30, 30, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-top: none;
+    border-radius: 0 0 14px 14px;
+    padding: 8px 10px;
+    spacing: 10px;
+}
+
+.stage-manager-thumbnail:hover .stage-manager-thumbnail-bottom-panel {
+    background-color: rgba(45, 45, 45, 0.95);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* App Icon */
+.stage-manager-app-icon {
+    width: 28px;
+    height: 28px;
+}
+
+/* App Name */
+.stage-manager-app-name {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 15px;
+    font-weight: 500;
+    max-width: 120px;
 }
 
 /* Active Window Indicator */
-.stage-manager-thumbnail-active {
-    border-color: rgba(53, 132, 228, 1.0);
-    border-width: 3px;
-    background-color: rgba(53, 132, 228, 0.2);
-    box-shadow: 0 0 16px rgba(53, 132, 228, 0.5);
+.stage-manager-thumbnail-active .stage-manager-screenshot-panel {
+    border: 3px solid rgba(53, 132, 228, 1.0);
+    background-color: rgba(53, 132, 228, 0.1);
 }
 
-.stage-manager-thumbnail-active:hover {
+.stage-manager-thumbnail-active .stage-manager-thumbnail-bottom-panel {
+    border: 3px solid rgba(53, 132, 228, 1.0);
+    border-top: none;
+    background-color: rgba(53, 132, 228, 0.1);
+}
+
+.stage-manager-thumbnail-active:hover .stage-manager-screenshot-panel,
+.stage-manager-thumbnail-active:hover .stage-manager-thumbnail-bottom-panel {
     border-color: rgba(53, 132, 228, 1.0);
-    background-color: rgba(53, 132, 228, 0.3);
+    background-color: rgba(53, 132, 228, 0.15);
 }
 
 /* Empty State */

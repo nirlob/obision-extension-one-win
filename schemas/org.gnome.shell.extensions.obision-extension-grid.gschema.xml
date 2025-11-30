@@ -9,13 +9,6 @@
       <description>Width of the side panel in pixels (auto-calculated thumbnail height)</description>
     </key>
 
-    <key name="resize-handle-width" type="i">
-      <default>12</default>
-      <range min="4" max="24"/>
-      <summary>Resize Handle Width</summary>
-      <description>Width of the resize handle in pixels</description>
-    </key>
-
     <key name="panel-position" type="s">
       <default>"left"</default>
       <summary>Panel Position</summary>

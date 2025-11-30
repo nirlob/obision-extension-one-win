@@ -36,24 +36,6 @@ export default class ObisionExtensionGridPreferences extends ExtensionPreference
         });
         displayGroup.add(panelPositionRow);
 
-        // Resize Handle Width
-        const resizeHandleRow = new Adw.SpinRow({
-            title: 'Resize Handle Width',
-            subtitle: 'Width of the resize handle in pixels',
-            adjustment: new Gtk.Adjustment({
-                lower: 4,
-                upper: 24,
-                step_increment: 1,
-            }),
-        });
-        displayGroup.add(resizeHandleRow);
-        settings.bind(
-            'resize-handle-width',
-            resizeHandleRow,
-            'value',
-            Gio.SettingsBindFlags.DEFAULT
-        );
-
         // Auto-hide Inactive Windows
         const autoHideRow = new Adw.SwitchRow({
             title: 'Minimize Inactive Windows',
