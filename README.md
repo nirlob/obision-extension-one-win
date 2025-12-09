@@ -1,20 +1,40 @@
 # Obision One Win
 
-A GNOME Shell extension for grid-based window management.
+A Stage Manager-style window management extension for GNOME Shell with live thumbnail previews and side panel navigation.
 
 ## Features
 
-- **Stage Manager Mode**: macOS-inspired window management
-- **Side Panel**: Live thumbnails of inactive windows
+- **Stage Manager Mode**: macOS-inspired window management with live thumbnails
+- **Side Panel**: Displays live thumbnails of all windows with real-time updates
 - **Active Window Area**: Main workspace for the focused application
-- **Real-time Window Clones**: Thumbnail previews update live
+- **Real-time Window Clones**: Thumbnail previews using compositor textures
 - **Quick Switching**: Click any thumbnail to activate that window
 - **Keyboard Shortcut**: Toggle Stage Manager with `Super+G` (configurable)
-- **Customizable**: Adjust panel width, thumbnail size, and position
+- **Resizable Panel**: Drag the resize handle to adjust panel width
+- **Theme Integration**: Automatic light/dark theme detection with GNOME accent colors
 - **Auto-minimize**: Optionally minimize inactive windows
+- **Hot Edge**: Hover over left edge when maximized to reveal panel
 - **Preferences UI**: Complete settings panel with Adwaita design
 
 ## Installation
+
+### From DEB Package (Recommended)
+
+Download the latest `.deb` package from [GitHub Releases](https://github.com/nirlob/obision-extension-one-win/releases) and install:
+
+```bash
+sudo dpkg -i obision-extension-one-win.deb
+sudo apt-get install -f
+```
+
+Then restart GNOME Shell:
+- **X11**: Press `Alt+F2`, type `r`, press Enter
+- **Wayland**: Log out and log back in
+
+Enable the extension:
+```bash
+gnome-extensions enable obision-extension-one-win@obision.com
+```
 
 ### From Source
 
@@ -31,9 +51,8 @@ A GNOME Shell extension for grid-based window management.
 
 3. Build and install the extension:
    ```bash
-   chmod +x build.sh
-   ./build.sh
-   npm run install
+   npm run build
+   npm run install-extension
    ```
 
 4. Enable the extension:
@@ -51,26 +70,36 @@ A GNOME Shell extension for grid-based window management.
 
 ```
 obision-extension-one-win/
-├── src/
-│   ├── js/
-│   │   ├── extension.js     # Main extension code
-│   │   └── prefs.js         # Preferences UI
-│   └── css/
-│       └── stylesheet.css   # Custom styles
-├── schemas/                 # GSettings schemas
-│   └── org.gnome.shell.extensions.obision-extension-one-win.gschema.xml
+├── extension.js            # Main extension code with GObject classes
+├── prefs.js                # Preferences UI with Adwaita widgets
+├── stylesheet.css          # Theme-aware styles
 ├── metadata.json           # Extension metadata
-├── package.json            # Node.js dependencies and scripts
-├── tsconfig.json           # TypeScript configuration
-├── .eslintrc.json          # ESLint configuration
-└── build.sh               # Build script
+├── schemas/                # GSettings schemas
+│   └── com.obision.extension-one-win.gschema.xml
+├── debian/                 # Debian packaging files
+│   ├── control
+│   ├── rules
+│   ├── changelog
+│   └── copyright
+├── scripts/                # Build and release scripts
+│   ├── build.sh
+│   ├── reload.sh
+│   └── release.sh
+├── .github/workflows/      # GitHub Actions CI/CD
+│   └── release.yml
+└── package.json            # npm scripts and dev dependencies
 ```
 
 ### Building
 
-Compile the extension:
+Build the extension package:
 ```bash
 npm run build
+```
+
+Build DEB package:
+```bash
+npm run deb-build
 ```
 
 ### Linting & Formatting
@@ -97,23 +126,47 @@ npm run format:check
 
 ### Quick Deploy
 
-Build, install, and enable in one command:
+Build, install, and show instructions:
 ```bash
 npm run deploy
+```
+
+Update and reload (X11 only):
+```bash
+npm run update
 ```
 
 ### Testing
 
 After making changes, reload the extension:
 ```bash
+npm run reload
+```
+
+Or manually:
+```bash
 gnome-extensions disable obision-extension-one-win@obision.com
 gnome-extensions enable obision-extension-one-win@obision.com
 ```
 
-View logs:
+View logs in real-time:
 ```bash
-journalctl -f -o cat /usr/bin/gnome-shell
+npm run logs
 ```
+
+### Creating a Release
+
+To create a new release with automatic version bumping:
+
+```bash
+npm run release
+```
+
+This will:
+1. Increment the minor version (e.g., 1.0.0 → 1.1.0)
+2. Update `package.json`, `metadata.json`, and `debian/changelog`
+3. Create a git commit and tag
+4. Push to GitHub, triggering automatic DEB package build and GitHub release
 
 ## Configuration
 
@@ -123,8 +176,7 @@ gnome-extensions prefs obision-extension-one-win@obision.com
 ```
 
 Available settings:
-- **Panel Width**: Width of the side panel (200-500px)
-- **Thumbnail Height**: Height of window thumbnails (100-300px)
+- **Panel Width**: Width of the side panel (150-700px, resizable with drag handle)
 - **Panel Position**: Display panel on left or right side
 - **Auto-minimize**: Minimize windows not shown in panel
 - **Show App Names**: Display application names below thumbnails
@@ -132,24 +184,62 @@ Available settings:
 
 ## Usage
 
-1. Press `Super+G` to activate Stage Manager mode
-2. The side panel appears showing thumbnails of all inactive windows
+1. Stage Manager activates automatically on login
+2. The side panel shows live thumbnails of all windows
 3. The focused window is displayed in the main area
-4. Click any thumbnail to switch to that window
-5. Press `Super+G` again to deactivate and return to normal mode
-6. Customize panel size, position, and behavior in preferences
+4. **Single click** a thumbnail to activate that window
+5. **Double click** a thumbnail to activate and maximize
+6. **Right click** a thumbnail for context menu (new window, close, etc.)
+7. Press `Super+G` to toggle Stage Manager on/off
+8. Drag the resize handle on the panel to adjust width
 
-**Tips:**
-- Thumbnails update in real-time showing window contents
-- Inactive windows are automatically minimized (configurable)
-- The active window is resized to make room for the panel
-- All window positions are restored when Stage Manager is disabled
+**Window Management:**
+- Click close button (×) on thumbnail to close window
+- Inactive windows are automatically minimized
+- Active window automatically resizes to fit available space
+- When maximized, hover left edge to reveal panel
+- Panel auto-hides when no windows are open
+
+**Theme Integration:**
+- Automatic light/dark theme detection
+- Active window border uses GNOME accent color
+- Supports all GNOME accent colors (blue, teal, green, yellow, orange, red, pink, purple, slate)
 
 ## Requirements
 
 - GNOME Shell 48 or later
 - GLib 2.0
-- GTK 4.0
+- For DEB package building: `debhelper`, `devscripts`, `gnome-shell-common`
+- For development: Node.js, npm
+
+## npm Scripts Reference
+
+**Building:**
+- `npm run build` - Compile schemas and pack extension
+- `npm run compile-schemas` - Compile GSettings schemas only
+- `npm run pack` - Create extension package
+- `npm run deb-build` - Build Debian package
+
+**Installation:**
+- `npm run install-extension` - Install extension to system
+- `npm run enable` - Enable the extension
+- `npm run deploy` - Build + install + show instructions
+- `npm run deb-install` - Install DEB package
+
+**Development:**
+- `npm run update` - Build + install + reload (X11 only)
+- `npm run reload` - Reload extension without rebuilding
+- `npm run logs` - View GNOME Shell logs in real-time
+- `npm run clean` - Remove build artifacts
+
+**Code Quality:**
+- `npm run lint` - Check code with ESLint
+- `npm run lint:fix` - Auto-fix linting issues
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check formatting
+
+**Release:**
+- `npm run release` - Create new release (bump version, tag, push)
 
 ## Contributing
 
@@ -159,7 +249,9 @@ Contributions are welcome! Please follow these guidelines:
 2. Create a feature branch
 3. Make your changes
 4. Run linting: `npm run lint`
-5. Submit a pull request
+5. Run formatting: `npm run format`
+6. Test the extension thoroughly
+7. Submit a pull request
 
 ## License
 

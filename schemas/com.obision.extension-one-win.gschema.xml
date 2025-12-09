@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.gnome.shell.extensions.obision-extension-one-win" path="/org/gnome/shell/extensions/obision-extension-one-win/">
+  <schema id="com.obision.extension-one-win" path="/com/obision/extension-one-win/">
     
     <key name="panel-width" type="i">
       <default>200</default>
