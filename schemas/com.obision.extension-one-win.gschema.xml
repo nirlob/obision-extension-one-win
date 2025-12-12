@@ -33,5 +33,11 @@
       <description>Keyboard shortcut to show/hide the grid overlay</description>
     </key>
 
+    <key name="open-preferences" type="as">
+      <default>['&lt;Primary&gt;comma']</default>
+      <summary>Open Preferences</summary>
+      <description>Keyboard shortcut to open preferences window</description>
+    </key>
+
   </schema>
 </schemalist>

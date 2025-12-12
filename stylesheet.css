@@ -475,3 +475,9 @@
     padding: 20px;
     font-style: italic;
 }
+
+/* Menu Accelerators - dimmed style like GNOME apps */
+.menu-accelerator {
+    color: rgba(255, 255, 255, 0.5);
+    margin-left: 24px;
+}

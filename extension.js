@@ -995,8 +995,43 @@ const StageManagerPanel = GObject.registerClass(
             Main.uiGroup.add_child(this._headerMenu.actor);
             this._headerMenu.actor.hide();
 
-            // Add Preferences option
-            this._headerMenu.addAction('Preferences...', () => {
+            // Add Hide Panel option
+            this._headerMenu.addAction('Hide Panel', () => {
+                if (this._extension) {
+                    this._extension._hidePanelAnimated();
+                }
+                this._closeHeaderMenu();
+            });
+
+            // Add Show Desktop option
+            this._headerMenu.addAction('Show Desktop', () => {
+                if (this._extension) {
+                    this._extension._showDesktop();
+                }
+                this._closeHeaderMenu();
+            });
+
+            // Add separator
+            this._headerMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+            // Add Preferences option with accelerator
+            const prefsItem = new PopupMenu.PopupBaseMenuItem();
+            const prefsBox = new St.BoxLayout({ x_expand: true });
+            const prefsLabel = new St.Label({
+                text: 'Preferences...',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            const prefsSpacer = new St.Widget({ x_expand: true });
+            const prefsAccel = new St.Label({
+                text: 'Ctrl+,',
+                y_align: Clutter.ActorAlign.CENTER,
+                style_class: 'menu-accelerator',
+            });
+            prefsBox.add_child(prefsLabel);
+            prefsBox.add_child(prefsSpacer);
+            prefsBox.add_child(prefsAccel);
+            prefsItem.add_child(prefsBox);
+            prefsItem.connect('activate', () => {
                 if (this._extension) {
                     try {
                         // Check if preferences window is already open
@@ -1015,6 +1050,52 @@ const StageManagerPanel = GObject.registerClass(
                 }
                 this._closeHeaderMenu();
             });
+            this._headerMenu.addMenuItem(prefsItem);
+
+            // Add separator
+            this._headerMenu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+            // Get the toggle-grid shortcut from settings
+            let shortcutText = 'Super+G';
+            try {
+                if (this._settings) {
+                    const shortcuts = this._settings.get_strv('toggle-grid');
+                    if (shortcuts && shortcuts.length > 0) {
+                        // Convert <Super>g to Super+G format
+                        shortcutText = shortcuts[0]
+                            .replace(/<([^>]+)>/g, '$1+')
+                            .replace(/\+([a-z])/g, (match, p1) => '+' + p1.toUpperCase());
+                    }
+                }
+            } catch (e) {
+                log(`Error getting shortcut: ${e}`);
+            }
+
+            // Add Disable One Win option (no shortcut - would remove the keybinding)
+            const disableItem = new PopupMenu.PopupBaseMenuItem();
+            const disableBox = new St.BoxLayout({ x_expand: true });
+            const disableLabel = new St.Label({
+                text: 'Disable One Win',
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            disableBox.add_child(disableLabel);
+            disableItem.add_child(disableBox);
+            disableItem.connect('activate', () => {
+                this._closeHeaderMenu();
+                if (this._extension) {
+                    try {
+                        // Disable the extension using GNOME Shell's extension manager
+                        const uuid = this._extension.metadata.uuid;
+                        const extensionManager = Main.extensionManager;
+                        if (extensionManager) {
+                            extensionManager.disableExtension(uuid);
+                        }
+                    } catch (e) {
+                        log(`Error disabling extension: ${e}`);
+                    }
+                }
+            });
+            this._headerMenu.addMenuItem(disableItem);
 
             // Close menu when it loses focus
             this._headerMenuOpenStateId = this._headerMenu.connect('open-state-changed', (menu, open) => {
@@ -1150,6 +1231,30 @@ export default class ObisionExtensionGrid extends Extension {
             () => this._toggleStageManager()
         );
 
+        // Add keybinding to open preferences
+        Main.wm.addKeybinding(
+            'open-preferences',
+            this._settings,
+            Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL,
+            () => {
+                try {
+                    // Check if preferences window is already open
+                    const prefsWindow = this._findPreferencesWindow();
+                    if (prefsWindow) {
+                        // If open, activate it
+                        prefsWindow.unminimize();
+                        prefsWindow.activate(global.get_current_time());
+                    } else {
+                        // If not open, open it
+                        this.openPreferences();
+                    }
+                } catch (e) {
+                    log(`Error opening preferences with keybinding: ${e}`);
+                }
+            }
+        );
+
         // Monitor for window changes
         this._windowCreatedId = global.display.connect('window-created', (display, window) => {
             if (this._active) {
@@ -1237,11 +1342,12 @@ export default class ObisionExtensionGrid extends Extension {
                 this._deactivateStageManager();
             }
 
-            // Remove keybinding
+            // Remove keybindings
             try {
                 Main.wm.removeKeybinding('toggle-grid');
+                Main.wm.removeKeybinding('open-preferences');
             } catch (e) {
-                log(`Error removing keybinding: ${e}`);
+                log(`Error removing keybindings: ${e}`);
             }
 
             // Disconnect signals
