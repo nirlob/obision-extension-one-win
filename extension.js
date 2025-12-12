@@ -215,8 +215,9 @@ const WindowThumbnail = GObject.registerClass(
             const app = Shell.WindowTracker.get_default().get_window_app(this._window);
             if (!app) return;
 
-            // Create popup menu
+            // Close any existing menu
             if (this._menu) {
+                this._menu.close(false);
                 this._menu.destroy();
                 this._menu = null;
             }
@@ -253,6 +254,42 @@ const WindowThumbnail = GObject.registerClass(
             // Quit app
             this._menu.addAction('Salir', () => {
                 app.request_quit();
+            });
+
+            // Close menu when it loses focus or on outside click
+            this._menu.connect('open-state-changed', (menu, open) => {
+                if (!open && this._menu) {
+                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 0, () => {
+                        if (this._menu) {
+                            this._menu.destroy();
+                            this._menu = null;
+                        }
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
+            });
+
+            // Capture clicks outside the menu to close it
+            this._menuCaptureId = global.stage.connect('captured-event', (actor, capturedEvent) => {
+                if (capturedEvent.type() === Clutter.EventType.BUTTON_PRESS) {
+                    // Check if click is outside the menu
+                    const [stageX, stageY] = capturedEvent.get_coords();
+                    const menuActor = this._menu.actor;
+                    if (menuActor && menuActor.visible) {
+                        const [menuX, menuY] = menuActor.get_transformed_position();
+                        const menuWidth = menuActor.width;
+                        const menuHeight = menuActor.height;
+
+                        const isOutside = stageX < menuX || stageX > menuX + menuWidth ||
+                            stageY < menuY || stageY > menuY + menuHeight;
+
+                        if (isOutside && this._menu) {
+                            this._menu.close(false);
+                            return Clutter.EVENT_STOP;
+                        }
+                    }
+                }
+                return Clutter.EVENT_PROPAGATE;
             });
 
             // Position and open menu
@@ -316,13 +353,10 @@ const WindowThumbnail = GObject.registerClass(
                     });
                 }
 
-                this._window.activate(global.get_current_time());
+                this._activateWindow(this._window);
             } catch (e) {
                 // Fallback - just activate
-                if (this._window.minimized) {
-                    this._window.unminimize();
-                }
-                this._window.activate(global.get_current_time());
+                this._activateWindow(this._window);
             }
         }
 
@@ -351,6 +385,13 @@ const WindowThumbnail = GObject.registerClass(
             });
         }
 
+        _activateWindow(window) {
+            if (window.minimized) {
+                window.unminimize();
+            }
+            window.activate(global.get_current_time());
+        }
+
         _handleDoubleClick() {
             const focusWindow = global.display.focus_window;
 
@@ -359,12 +400,41 @@ const WindowThumbnail = GObject.registerClass(
                 this._window.maximize(Meta.MaximizeFlags.BOTH);
             } else {
                 // Double click on inactive thumbnail - activate and maximize
-                if (this._window.minimized) {
-                    this._window.unminimize();
-                }
-                this._window.activate(global.get_current_time());
+                this._activateWindow(this._window);
                 this._window.maximize(Meta.MaximizeFlags.BOTH);
             }
+        }
+
+        _updateCloneTransform(clone, containerWidth, containerHeight) {
+            // Get frame rect (visible window without shadows)
+            const frameRect = this._window.get_frame_rect();
+            const bufferRect = this._window.get_buffer_rect();
+
+            // Calculate shadow/decoration offsets
+            const shadowLeft = Math.abs(frameRect.x - bufferRect.x);
+            const shadowTop = Math.abs(frameRect.y - bufferRect.y);
+
+            // Use frame rect dimensions (visible window)
+            const windowWidth = frameRect.width;
+            const windowHeight = frameRect.height;
+
+            // Calculate scale to fit container while maintaining aspect ratio
+            const scaleX = containerWidth / windowWidth;
+            const scaleY = containerHeight / windowHeight;
+            const scale = Math.min(scaleX, scaleY);
+
+            // Apply scale
+            clone.set_scale(scale, scale);
+
+            // Calculate position to center the visible window content
+            const scaledWidth = windowWidth * scale;
+            const scaledHeight = windowHeight * scale;
+
+            // Position considering shadow offsets
+            const x = (containerWidth - scaledWidth) / 2 - (shadowLeft * scale);
+            const y = (containerHeight - scaledHeight) / 2 - (shadowTop * scale);
+
+            clone.set_position(x, y);
         }
 
         _createClone() {
@@ -381,35 +451,8 @@ const WindowThumbnail = GObject.registerClass(
                 const containerWidth = calculateScreenshotWidth(thumbnailWidth);
                 const containerHeight = calculateScreenshotHeight(containerWidth);
 
-                // Get frame rect (visible window without shadows)
-                const frameRect = this._window.get_frame_rect();
-                const bufferRect = this._window.get_buffer_rect();
-
-                // Calculate shadow/decoration offsets
-                const shadowLeft = Math.abs(frameRect.x - bufferRect.x);
-                const shadowTop = Math.abs(frameRect.y - bufferRect.y);
-
-                // Use frame rect dimensions (visible window)
-                const windowWidth = frameRect.width;
-                const windowHeight = frameRect.height;
-
-                // Calculate scale to fit container while maintaining aspect ratio
-                const scaleX = containerWidth / windowWidth;
-                const scaleY = containerHeight / windowHeight;
-                const scale = Math.min(scaleX, scaleY);
-
-                // Apply scale
-                clone.set_scale(scale, scale);
-
-                // Calculate position to center the visible window content
-                const scaledWidth = windowWidth * scale;
-                const scaledHeight = windowHeight * scale;
-
-                // Position considering shadow offsets
-                const x = (containerWidth - scaledWidth) / 2 - (shadowLeft * scale);
-                const y = (containerHeight - scaledHeight) / 2 - (shadowTop * scale);
-
-                clone.set_position(x, y);
+                // Apply transform (scale and position)
+                this._updateCloneTransform(clone, containerWidth, containerHeight);
 
                 this._cloneContainer.add_child(clone);
                 this._clone = clone;
@@ -457,31 +500,8 @@ const WindowThumbnail = GObject.registerClass(
                 if (this._clone) {
                     const windowActor = this._window.get_compositor_private();
                     if (windowActor) {
-                        // Get both rects for proper positioning
-                        const frameRect = this._window.get_frame_rect();
-                        const bufferRect = this._window.get_buffer_rect();
-
-                        // Calculate shadow offsets
-                        const shadowLeft = Math.abs(frameRect.x - bufferRect.x);
-                        const shadowTop = Math.abs(frameRect.y - bufferRect.y);
-
-                        // Use frame rect dimensions (visible window)
-                        const windowWidth = frameRect.width;
-                        const windowHeight = frameRect.height;
-
-                        // Recalculate scale
-                        const scaleX = screenshotWidth / windowWidth;
-                        const scaleY = screenshotHeight / windowHeight;
-                        const scale = Math.min(scaleX, scaleY);
-
-                        this._clone.set_scale(scale, scale);
-
-                        // Recenter considering shadows
-                        const scaledWidth = windowWidth * scale;
-                        const scaledHeight = windowHeight * scale;
-                        const x = (screenshotWidth - scaledWidth) / 2 - (shadowLeft * scale);
-                        const y = (screenshotHeight - scaledHeight) / 2 - (shadowTop * scale);
-                        this._clone.set_position(x, y);
+                        // Reuse the transform calculation method
+                        this._updateCloneTransform(this._clone, screenshotWidth, screenshotHeight);
                     }
                 }
             } catch (e) {
@@ -491,7 +511,12 @@ const WindowThumbnail = GObject.registerClass(
 
         destroy() {
             try {
+                if (this._menuCaptureId) {
+                    global.stage.disconnect(this._menuCaptureId);
+                    this._menuCaptureId = null;
+                }
                 if (this._menu) {
+                    this._menu.close(false);
                     this._menu.destroy();
                     this._menu = null;
                 }
@@ -535,7 +560,158 @@ const StageManagerPanel = GObject.registerClass(
             // Detect and apply theme variant
             this._applyThemeVariant();
 
-            // Scroll view for thumbnails (takes most space)
+            // Main container for content (left side, excluding resize handle)
+            this._contentContainer = new St.BoxLayout({
+                vertical: true,
+                x_expand: true,
+                y_expand: true,
+            });
+
+            // Top header panel (fixed, not affected by scroll)
+            this._headerPanel = new St.BoxLayout({
+                style_class: 'stage-manager-header-panel',
+                vertical: false,
+                x_expand: true,
+                height: 47,
+            });
+
+            // Hide panel button (left side)
+            const closeIcon = new St.Icon({
+                icon_name: 'sidebar-show-symbolic',
+                icon_size: 16,
+                style_class: 'stage-manager-header-icon',
+            });
+
+            this._closeButton = new St.Button({
+                style_class: 'stage-manager-header-button',
+                child: closeIcon,
+                reactive: true,
+                can_focus: false,
+                track_hover: true,
+            });
+
+            // Add tooltip
+            this._closeButtonTooltip = new St.Label({
+                style_class: 'tooltip',
+                text: 'Hide panel',
+                visible: false,
+            });
+            Main.uiGroup.add_child(this._closeButtonTooltip);
+
+            this._closeButton.connect('enter-event', () => {
+                const [x, y] = this._closeButton.get_transformed_position();
+                const [width, height] = this._closeButton.get_size();
+                this._closeButtonTooltip.set_position(x + width / 2 - this._closeButtonTooltip.width / 2, y + height + 5);
+                this._closeButtonTooltip.show();
+            });
+
+            this._closeButton.connect('leave-event', () => {
+                this._closeButtonTooltip.hide();
+            });
+
+            this._closeButton.connect('clicked', () => {
+                this._closeButtonTooltip.hide();
+                if (this._extension) {
+                    this._extension._hidePanelAnimated();
+                }
+            });
+
+            this._headerPanel.add_child(this._closeButton);
+
+            // Show desktop button (next to close button)
+            const desktopIcon = new St.Icon({
+                icon_name: 'computer-symbolic',
+                icon_size: 16,
+                style_class: 'stage-manager-header-icon',
+            });
+
+            this._desktopButton = new St.Button({
+                style_class: 'stage-manager-header-button',
+                child: desktopIcon,
+                reactive: true,
+                can_focus: false,
+                track_hover: true,
+            });
+
+            // Add tooltip
+            this._desktopButtonTooltip = new St.Label({
+                style_class: 'tooltip',
+                text: 'Show desktop',
+                visible: false,
+            });
+            Main.uiGroup.add_child(this._desktopButtonTooltip);
+
+            this._desktopButton.connect('enter-event', () => {
+                const [x, y] = this._desktopButton.get_transformed_position();
+                const [width, height] = this._desktopButton.get_size();
+                this._desktopButtonTooltip.set_position(x + width / 2 - this._desktopButtonTooltip.width / 2, y + height + 5);
+                this._desktopButtonTooltip.show();
+            });
+
+            this._desktopButton.connect('leave-event', () => {
+                this._desktopButtonTooltip.hide();
+            });
+
+            this._desktopButton.connect('clicked', () => {
+                this._desktopButtonTooltip.hide();
+                if (this._extension) {
+                    this._extension._showDesktop();
+                }
+            });
+
+            this._headerPanel.add_child(this._desktopButton);
+
+            // Spacer to push menu button to the right
+            const spacer = new St.Widget({
+                x_expand: true,
+            });
+            this._headerPanel.add_child(spacer);
+
+            // Menu button (right side)
+            const menuIcon = new St.Icon({
+                icon_name: 'open-menu-symbolic',
+                icon_size: 16,
+                style_class: 'stage-manager-header-icon',
+            });
+
+            this._menuButton = new St.Button({
+                style_class: 'stage-manager-header-button',
+                child: menuIcon,
+                reactive: true,
+                can_focus: false,
+                track_hover: true,
+            });
+
+            // Add tooltip
+            this._menuButtonTooltip = new St.Label({
+                style_class: 'tooltip',
+                text: 'Menu',
+                visible: false,
+            });
+            Main.uiGroup.add_child(this._menuButtonTooltip);
+
+            this._menuButton.connect('enter-event', () => {
+                const [x, y] = this._menuButton.get_transformed_position();
+                const [width, height] = this._menuButton.get_size();
+                this._menuButtonTooltip.set_position(x + width / 2 - this._menuButtonTooltip.width / 2, y + height + 5);
+                this._menuButtonTooltip.show();
+            });
+
+            this._menuButton.connect('leave-event', () => {
+                this._menuButtonTooltip.hide();
+            });
+
+            this._menuButton.connect('clicked', () => {
+                this._menuButtonTooltip.hide();
+                this._showHeaderMenu();
+            });
+
+            this._headerPanel.add_child(this._menuButton);
+
+            // Add header to content container
+            this._contentContainer.add_child(this._headerPanel);
+
+            // Scroll view for thumbnails (takes remaining space)
             this._scrollView = new St.ScrollView({
                 style_class: 'stage-manager-scroll',
                 x_expand: true,
@@ -551,7 +727,10 @@ const StageManagerPanel = GObject.registerClass(
             });
 
             this._scrollView.add_child(this._thumbnailBox);
-            this.add_child(this._scrollView);
+            this._contentContainer.add_child(this._scrollView);
+
+            // Add content container to panel
+            this.add_child(this._contentContainer);
 
             // Resize handle - inside the panel, aligned to the right edge
             this._resizeHandle = new St.BoxLayout({
@@ -728,7 +907,7 @@ const StageManagerPanel = GObject.registerClass(
                         focusWindow.get_window_type() === Meta.WindowType.NORMAL &&
                         focusWindow.get_maximized() === 0) {
                         // Re-activate the window to restore focus
-                        focusWindow.activate(global.get_current_time());
+                        this._activateWindow(focusWindow);
                         this._extension._adjustActiveWindow(focusWindow);
                     }
                 }
@@ -788,8 +967,11 @@ const StageManagerPanel = GObject.registerClass(
 
         _getAccentColor() {
             try {
-                const settings = new Gio.Settings({ schema: 'org.gnome.desktop.interface' });
-                const accentColor = settings.get_string('accent-color');
+                // Reuse the interface settings instance created in _applyThemeVariant
+                if (!this._interfaceSettings) {
+                    this._interfaceSettings = new Gio.Settings({ schema: 'org.gnome.desktop.interface' });
+                }
+                const accentColor = this._interfaceSettings.get_string('accent-color');
                 // Valid accent colors: blue, teal, green, yellow, orange, red, pink, purple, slate
                 const validColors = ['blue', 'teal', 'green', 'yellow', 'orange', 'red', 'pink', 'purple', 'slate'];
                 if (validColors.includes(accentColor)) {
@@ -802,8 +984,115 @@ const StageManagerPanel = GObject.registerClass(
             }
         }
 
+        _showHeaderMenu() {
+            // Close any existing menu
+            if (this._headerMenu) {
+                this._closeHeaderMenu();
+                return;
+            }
+
+            this._headerMenu = new PopupMenu.PopupMenu(this._menuButton, 0.5, St.Side.BOTTOM);
+            Main.uiGroup.add_child(this._headerMenu.actor);
+            this._headerMenu.actor.hide();
+
+            // Add Preferences option
+            this._headerMenu.addAction('Preferences...', () => {
+                if (this._extension) {
+                    try {
+                        // Check if preferences window is already open
+                        const prefsWindow = this._extension._findPreferencesWindow();
+                        if (prefsWindow) {
+                            // If open, activate it and select its thumbnail
+                            prefsWindow.unminimize();
+                            prefsWindow.activate(global.get_current_time());
+                        } else {
+                            // If not open, open it
+                            this._extension.openPreferences();
+                        }
+                    } catch (e) {
+                        log(`Error opening preferences: ${e}`);
+                    }
+                }
+                this._closeHeaderMenu();
+            });
+
+            // Close menu when it loses focus
+            this._headerMenuOpenStateId = this._headerMenu.connect('open-state-changed', (menu, open) => {
+                if (!open) {
+                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+                        this._closeHeaderMenu();
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
+            });
+
+            // Close menu when clicking outside
+            this._headerMenuCapturedEventId = global.stage.connect('captured-event', (actor, event) => {
+                if (event.type() === Clutter.EventType.BUTTON_PRESS) {
+                    const [x, y] = event.get_coords();
+                    const menuActor = this._headerMenu?.actor;
+                    const buttonActor = this._menuButton;
+
+                    if (menuActor && buttonActor) {
+                        const [menuX, menuY] = menuActor.get_transformed_position();
+                        const [menuWidth, menuHeight] = menuActor.get_size();
+                        const [buttonX, buttonY] = buttonActor.get_transformed_position();
+                        const [buttonWidth, buttonHeight] = buttonActor.get_size();
+
+                        const isInsideMenu = x >= menuX && x <= menuX + menuWidth &&
+                            y >= menuY && y <= menuY + menuHeight;
+                        const isInsideButton = x >= buttonX && x <= buttonX + buttonWidth &&
+                            y >= buttonY && y <= buttonY + buttonHeight;
+
+                        if (!isInsideMenu && !isInsideButton) {
+                            this._closeHeaderMenu();
+                        }
+                    }
+                }
+                return Clutter.EVENT_PROPAGATE;
+            });
+
+            this._headerMenu.open();
+        }
+
+        _closeHeaderMenu() {
+            if (this._headerMenu) {
+                if (this._headerMenuOpenStateId) {
+                    this._headerMenu.disconnect(this._headerMenuOpenStateId);
+                    this._headerMenuOpenStateId = null;
+                }
+                if (this._headerMenuCapturedEventId) {
+                    global.stage.disconnect(this._headerMenuCapturedEventId);
+                    this._headerMenuCapturedEventId = null;
+                }
+                this._headerMenu.close(false);
+                this._headerMenu.destroy();
+                this._headerMenu = null;
+            }
+        }
+
         destroy() {
             try {
+                // Close header menu if open
+                this._closeHeaderMenu();
+
+                // Remove tooltips
+                if (this._closeButtonTooltip) {
+                    Main.uiGroup.remove_child(this._closeButtonTooltip);
+                    this._closeButtonTooltip.destroy();
+                    this._closeButtonTooltip = null;
+                }
+                if (this._desktopButtonTooltip) {
+                    Main.uiGroup.remove_child(this._desktopButtonTooltip);
+                    this._desktopButtonTooltip.destroy();
+                    this._desktopButtonTooltip = null;
+                }
+                if (this._menuButtonTooltip) {
+                    Main.uiGroup.remove_child(this._menuButtonTooltip);
+                    this._menuButtonTooltip.destroy();
+                    this._menuButtonTooltip = null;
+                }
+
                 // Disconnect theme listener
                 if (this._themeChangedId && this._interfaceSettings) {
                     this._interfaceSettings.disconnect(this._themeChangedId);
@@ -1053,6 +1342,54 @@ export default class ObisionExtensionGrid extends Extension {
         }
     }
 
+    _activateWindow(window) {
+        if (window.minimized) {
+            window.unminimize();
+        }
+        window.activate(global.get_current_time());
+    }
+
+    _findPreferencesWindow() {
+        // Look for the preferences window by title or WM_CLASS
+        const windows = global.get_window_actors().map(a => a.meta_window);
+        return windows.find(w => {
+            if (!w || w.skip_taskbar || w.get_window_type() !== Meta.WindowType.NORMAL) {
+                return false;
+            }
+            const title = w.get_title() || '';
+            const wmClass = w.get_wm_class() || '';
+            // Preferences window typically has "Preferences" in title or is the extension prefs
+            return title.includes('Preferences') ||
+                title.includes('obision-extension-one-win') ||
+                wmClass.includes('org.gnome.Shell.Extensions');
+        });
+    }
+
+    _showDesktop() {
+        try {
+            // Get all normal windows
+            const windows = global.get_window_actors()
+                .map(a => a.meta_window)
+                .filter(w => w && !w.skip_taskbar && w.get_window_type() === Meta.WindowType.NORMAL);
+
+            // Minimize all windows
+            windows.forEach(window => {
+                try {
+                    if (!window.minimized) {
+                        window.minimize();
+                    }
+                } catch (e) {
+                    log(`Error minimizing window in showDesktop: ${e}`);
+                }
+            });
+
+            // Hide the panel
+            this._hidePanelAnimated();
+        } catch (e) {
+            log(`Error in showDesktop: ${e}`);
+        }
+    }
+
     _toggleStageManager() {
         if (this._active) {
             this._deactivateStageManager();
@@ -1127,6 +1464,14 @@ export default class ObisionExtensionGrid extends Extension {
 
             const hiddenX = monitor.x - this._panel._panelWidth;
 
+            // Maximize active window when hiding panel
+            const focusWindow = global.display.focus_window;
+            if (focusWindow && !focusWindow.skip_taskbar &&
+                focusWindow.get_window_type() === Meta.WindowType.NORMAL &&
+                focusWindow.get_maximized() === 0) {
+                focusWindow.maximize(Meta.MaximizeFlags.BOTH);
+            }
+
             // Slide out to the left (same animation as maximize)
             this._panel.ease({
                 x: hiddenX,
@@ -1189,16 +1534,21 @@ export default class ObisionExtensionGrid extends Extension {
             }
 
             // Minimize or hide other windows
-            windows.forEach(window => {
-                try {
-                    if (window !== focusWindow) {
-                        // Keep them on workspace but not visible in main area
-                        window.minimize();
+            // Don't minimize if header menu is open (it can steal focus temporarily)
+            const isHeaderMenuOpen = this._panel?._headerMenu !== null && this._panel?._headerMenu !== undefined;
+
+            if (!isHeaderMenuOpen) {
+                windows.forEach(window => {
+                    try {
+                        if (window !== focusWindow) {
+                            // Keep them on workspace but not visible in main area
+                            window.minimize();
+                        }
+                    } catch (e) {
+                        log(`Error minimizing window: ${e}`);
                     }
-                } catch (e) {
-                    log(`Error minimizing window: ${e}`);
-                }
-            });
+                });
+            }
         } catch (e) {
             log(`Error updating layout: ${e}`);
         }
@@ -1281,8 +1631,8 @@ export default class ObisionExtensionGrid extends Extension {
                 // Delay activation to let window initialize
                 GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
                     try {
-                        if (window && !window.minimized) {
-                            window.activate(global.get_current_time());
+                        if (window) {
+                            this._activateWindow(window);
                         }
                     } catch (e) { }
                     return GLib.SOURCE_REMOVE;
@@ -1291,9 +1641,13 @@ export default class ObisionExtensionGrid extends Extension {
 
             // Scroll to top when new window is added
             if (this._panel && this._panel._scrollView) {
-                const vscroll = this._panel._scrollView.get_vscroll_bar();
-                if (vscroll) {
-                    vscroll.get_adjustment().set_value(0);
+                try {
+                    const vscroll = this._panel._scrollView.vscroll;
+                    if (vscroll && vscroll.adjustment) {
+                        vscroll.adjustment.set_value(0);
+                    }
+                } catch (e) {
+                    log(`Error scrolling to top: ${e}`);
                 }
             }
 
@@ -1380,9 +1734,13 @@ export default class ObisionExtensionGrid extends Extension {
 
                 // Scroll to top
                 if (this._panel._scrollView) {
-                    const vscroll = this._panel._scrollView.get_vscroll_bar();
-                    if (vscroll) {
-                        vscroll.get_adjustment().set_value(0);
+                    try {
+                        const vscroll = this._panel._scrollView.vscroll;
+                        if (vscroll && vscroll.adjustment) {
+                            vscroll.adjustment.set_value(0);
+                        }
+                    } catch (e) {
+                        log(`Error scrolling to top: ${e}`);
                     }
                 }
             }
@@ -1407,17 +1765,11 @@ export default class ObisionExtensionGrid extends Extension {
                 try {
                     // Verify window still exists
                     if (windows.includes(previousWindow)) {
-                        if (previousWindow.minimized) {
-                            previousWindow.unminimize();
-                        }
-                        previousWindow.activate(global.get_current_time());
+                        this._activateWindow(previousWindow);
                     } else {
                         // Window in history no longer exists, activate the first available
                         const firstWindow = windows[0];
-                        if (firstWindow.minimized) {
-                            firstWindow.unminimize();
-                        }
-                        firstWindow.activate(global.get_current_time());
+                        this._activateWindow(firstWindow);
                     }
                 } catch (e) {
                     log(`Error activating previous window: ${e}`);
@@ -1426,10 +1778,7 @@ export default class ObisionExtensionGrid extends Extension {
                 // No history but have windows - activate first
                 const firstWindow = windows[0];
                 try {
-                    if (firstWindow.minimized) {
-                        firstWindow.unminimize();
-                    }
-                    firstWindow.activate(global.get_current_time());
+                    this._activateWindow(firstWindow);
                 } catch (e) {
                     log(`Error activating first window: ${e}`);
                 }
@@ -1460,15 +1809,26 @@ export default class ObisionExtensionGrid extends Extension {
         this._hotEdge.set_position(monitor.x, monitor.y);
 
         this._hotEdge.connect('enter-event', () => {
-            if (!this._active) return Clutter.EVENT_PROPAGATE;
+            // If Stage Manager is not active, activate it
+            if (!this._active) {
+                this._activateStageManager();
+                return Clutter.EVENT_PROPAGATE;
+            }
 
             const focusWindow = global.display.focus_window;
-            // Only show panel if current window is maximized
+            // Only show panel if current window is maximized or if panel is hidden
             if (focusWindow && focusWindow.get_maximized() !== 0) {
                 // Unmaximize and show panel
                 focusWindow.unmaximize(Meta.MaximizeFlags.BOTH);
                 this._showPanelAnimated();
                 this._adjustActiveWindow(focusWindow);
+                this._panel.updateThumbnails();
+            } else if (this._panel && !this._panel.visible) {
+                // Panel is hidden but Stage Manager is active, show it
+                this._showPanelAnimated();
+                if (focusWindow) {
+                    this._adjustActiveWindow(focusWindow);
+                }
                 this._panel.updateThumbnails();
             }
 
