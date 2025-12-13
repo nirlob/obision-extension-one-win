@@ -1,6 +1,6 @@
 {
   "name": "obision-extension-one-win",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Obision One Win - A GNOME Shell extension for one window work",
   "main": "extension.js",
   "scripts": {
